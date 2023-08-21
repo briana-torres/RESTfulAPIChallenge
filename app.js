@@ -44,6 +44,35 @@ app.get('/restaurants/:n', async (req, res) => {
     }
 });
 
+app.put('/restaurants/:name', async (req, res) => {
+    const { name } = req.params;
+    const { grade } = req.body;
+
+    try {
+        await client.connect();
+
+        const updateQuery = `
+        UPDATE restaurants
+        SET grades = jsonb_set(grades, '{-1}', ('{"date": {"$date": ' || extract(epoch from current_timestamp) * 1000 || '}, "grade": "' || $1 || '", "score": ' || CAST($2 AS TEXT) || '}')::jsonb)
+        WHERE name = $3
+        RETURNING *
+    `;
+
+        const { rows } = await client.query(updateQuery, [grade, 0, name]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Restaurant not found' });
+        }
+
+        res.json(rows[0]);
+    } catch (error) {
+        console.error('Error updating grade:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        await client.end();
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
