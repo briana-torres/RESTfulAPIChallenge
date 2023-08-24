@@ -10,9 +10,9 @@ mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true })
 
 const app = express();
 
-// Middleware for parsing JSON
 app.use(bodyParser.json());
 
+// GET n restaurants with the highest average ratings, sorted by average score
 app.get('/top/:n', async (req, res) => {
     const n = parseInt(req.params.n, 10);
 
@@ -21,11 +21,11 @@ app.get('/top/:n', async (req, res) => {
             {
                 $addFields: {
                     numberOfGrades: { $size: '$grades' },
-                    averageScore: { $avg: '$grades.score' }, 
+                    averageScore: { $avg: '$grades.score' },
                 },
             },
             {
-                $match: { 'numberOfGrades': { $gte: 5 } } 
+                $match: { 'numberOfGrades': { $gte: 5 } }
             },
             {
                 $sort: { averageScore: -1 },
@@ -33,22 +33,22 @@ app.get('/top/:n', async (req, res) => {
             {
                 $limit: n,
             },
-            ])
-            restaurants = restaurants.map(restaurant => ({
-                name: restaurant.name,
-                avgScore: restaurant.averageScore,
-            }));
-            res.status(200).json(restaurants);
+        ])
+        restaurants = restaurants.map(restaurant => ({
+            name: restaurant.name,
+            avgScore: restaurant.averageScore,
+        }));
+        res.status(200).json(restaurants);
     } catch (error) {
         console.error('Error fetching data:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
+// PUT the inspection grade of a restaurant for a given resturant_name 
 app.put('/update/:restaurant_name', async (req, res) => {
     const restaurantName = req.params.restaurant_name;
     const { grade } = req.body;
-    console.log(grade, restaurantName);
 
     try {
         const restaurant = await Restaurant.findOne({ name: restaurantName });
@@ -64,6 +64,34 @@ app.put('/update/:restaurant_name', async (req, res) => {
         res.status(200).json({ message: 'Grade updated successfully' });
     } catch (error) {
         console.error('Error updating grade:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// GET n restaurants in a given borough, b,  that serve a given cuisine, c
+app.get('/restaurants/:borough/:cuisine/:n', async (req, res) => {
+    const { borough, cuisine } = req.params;
+    const n = parseInt(req.params.n, 10);
+
+    try {
+        const restaurants = await Restaurant.find({
+            borough: borough,
+            cuisine: cuisine
+        })
+            .limit(n)
+            .select('name');
+
+        const names = restaurants.map(restaurant => restaurant.name);
+        const boroughs = new Array(n).fill(borough);
+        const cuisines = new Array(n).fill(cuisine);
+
+        res.status(200).json({
+            names: names,
+            boroughs: boroughs,
+            cuisines: cuisines
+        });
+    } catch (error) {
+        console.error('Error fetching data:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
